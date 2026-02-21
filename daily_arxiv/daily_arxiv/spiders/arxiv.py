@@ -11,6 +11,13 @@ class ArxivSpider(scrapy.Spider):
         # 保存目标分类列表，用于后续验证
         self.target_categories = set(map(str.strip, categories))
 
+        # 如果目标类别不是 cs.ALL，则使用 cs.ALL 作为主爬取类别，然后在 parse 中过滤
+        # 这样可以获取所有包含目标类别的论文（包括作为次要类别的情况）
+        if "cs.ALL" not in self.target_categories and len(self.target_categories) > 0:
+            self爬取_categories = {"cs.ALL"}
+        else:
+            self.爬取_categories = self.target_categories
+
         # 获取关键词过滤配置
         keywords = os.environ.get("KEYWORDS", "")
         if keywords:
@@ -19,8 +26,8 @@ class ArxivSpider(scrapy.Spider):
             self.keywords = []
 
         self.start_urls = [
-            f"https://arxiv.org/list/{cat}/new" for cat in self.target_categories
-        ]  # 起始URL（计算机科学领域的最新论文）
+            f"https://arxiv.org/list/{cat}/new" for cat in self.爬取_categories
+        ]  # 起始URL（使用 cs.ALL 获取所有论文，然后在 parse 中过滤）
 
     name = "arxiv"  # 爬虫名称
     allowed_domains = ["arxiv.org"]  # 允许爬取的域名
@@ -55,11 +62,12 @@ class ArxivSpider(scrapy.Spider):
             if not paper_dd:
                 continue
             
-            # 提取论文分类信息 - 在subjects部分
-            subjects_text = paper_dd.css(".list-subjects .primary-subject::text").get()
+            # 提取论文分类信息 - 获取所有类别（主类别+次要类别）
+            # 使用 .list-subjects 元素的完整文本内容
+            subjects_text = paper_dd.css(".list-subjects::text").get()
             if not subjects_text:
-                # 如果找不到主分类，尝试其他方式获取分类
-                subjects_text = paper_dd.css(".list-subjects::text").get()
+                # 备用：获取主类别文本
+                subjects_text = paper_dd.css(".list-subjects .primary-subject::text").get()
             
             # 提取论文标题
             title = paper_dd.css(".title::text").get()
