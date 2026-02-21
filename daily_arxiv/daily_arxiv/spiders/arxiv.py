@@ -11,13 +11,6 @@ class ArxivSpider(scrapy.Spider):
         # 保存目标分类列表，用于后续验证
         self.target_categories = set(map(str.strip, categories))
 
-        # 如果目标类别不是 cs.ALL，则使用 cs.ALL 作为主爬取类别，然后在 parse 中过滤
-        # 这样可以获取所有包含目标类别的论文（包括作为次要类别的情况）
-        if "cs.ALL" not in self.target_categories and len(self.target_categories) > 0:
-            self.crawl_categories = {"cs.ALL"}
-        else:
-            self.crawl_categories = self.target_categories
-
         # 获取关键词过滤配置
         keywords = os.environ.get("KEYWORDS", "")
         if keywords:
@@ -26,8 +19,8 @@ class ArxivSpider(scrapy.Spider):
             self.keywords = []
 
         self.start_urls = [
-            f"https://arxiv.org/list/{cat}/new" for cat in self.crawl_categories
-        ]  # 起始URL（使用 cs.ALL 获取所有论文，然后在 parse 中过滤）
+            f"https://arxiv.org/list/{cat}/new" for cat in self.target_categories
+        ]  # 起始URL（按类别爬取）
 
     name = "arxiv"  # 爬虫名称
     allowed_domains = ["arxiv.org"]  # 允许爬取的域名
