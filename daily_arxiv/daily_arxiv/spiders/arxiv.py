@@ -17,6 +17,9 @@ class ArxivSpider(scrapy.Spider):
         else:
             self.keywords = []
 
+        self.logger.info(f"目标分类: {self.target_categories}")
+        self.logger.info(f"关键词过滤: {self.keywords}")
+
         self.start_urls = [
             f"https://arxiv.org/list/{cat}/new" for cat in self.target_categories
         ]  # 起始URL（计算机科学领域的最新论文）
@@ -63,8 +66,10 @@ class ArxivSpider(scrapy.Spider):
             if self.keywords and title:
                 title_lower = title.lower()
                 if not any(kw in title_lower for kw in self.keywords):
-                    self.logger.debug(f"Skipped paper {arxiv_id} - title does not match keywords {self.keywords}")
+                    self.logger.info(f"关键词过滤跳过: {arxiv_id} - '{title}' 不包含 {self.keywords}")
                     continue
+            elif self.keywords:
+                self.logger.info(f"标题为空，跳过: {arxiv_id}")
 
             # 提取论文分类信息 - 在subjects部分
             subjects_text = paper_dd.css(".list-subjects .primary-subject::text").get()
