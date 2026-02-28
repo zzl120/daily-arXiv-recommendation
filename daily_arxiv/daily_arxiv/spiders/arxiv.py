@@ -2,7 +2,6 @@ import scrapy
 import os
 import re
 
-
 class ArxivSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -10,6 +9,14 @@ class ArxivSpider(scrapy.Spider):
         categories = categories.split(",")
         # 保存目标分类列表，用于后续验证
         self.target_categories = set(map(str.strip, categories))
+
+        # 获取关键词过滤配置
+        keywords = os.environ.get("KEYWORDS", "")
+        if keywords:
+            self.keywords = [k.strip().lower() for k in keywords.split(",") if k.strip()]
+        else:
+            self.keywords = []
+
         self.start_urls = [
             f"https://arxiv.org/list/{cat}/new" for cat in self.target_categories
         ]  # 起始URL（计算机科学领域的最新论文）
@@ -47,6 +54,18 @@ class ArxivSpider(scrapy.Spider):
             if not paper_dd:
                 continue
             
+            # 提取论文标题
+            title = paper_dd.css(".title::text").get()
+            if title:
+                title = title.strip()
+
+            # 关键词过滤：如果配置了关键词，则只保留包含任意一个关键词的论文
+            if self.keywords and title:
+                title_lower = title.lower()
+                if not any(kw in title_lower for kw in self.keywords):
+                    self.logger.debug(f"Skipped paper {arxiv_id} - title does not match keywords {self.keywords}")
+                    continue
+
             # 提取论文分类信息 - 在subjects部分
             subjects_text = paper_dd.css(".list-subjects .primary-subject::text").get()
             if not subjects_text:
