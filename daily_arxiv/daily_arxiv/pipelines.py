@@ -20,6 +20,8 @@ class DailyArxivPipeline:
 
         # 获取关键词过滤配置
         keywords = os.environ.get("KEYWORDS", "")
+        print(f"[DEBUG] Pipeline 读取的 KEYWORDS = '{keywords}'")
+
         if keywords:
             self.keywords = [k.strip().lower() for k in keywords.split(",") if k.strip()]
         else:
@@ -46,6 +48,8 @@ class DailyArxivPipeline:
             summary_lower = item["summary"].lower() if item["summary"] else ""
 
             if not any(kw in title_lower or kw in summary_lower for kw in self.keywords):
-                raise DropItem(f"关键词过滤跳过: {item['id']} - '{item['title']}' 不包含关键词 {self.keywords}")
+                # 关键词不匹配，返回 None 跳过
+                print(f"关键词过滤跳过: {item['id']} - '{item['title']}' 不包含关键词 {self.keywords}")
+                return None
 
         return item
