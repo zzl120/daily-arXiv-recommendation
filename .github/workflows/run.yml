@@ -41,11 +41,16 @@ jobs:
         export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
         export OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
         export TOKEN_GITHUB=${{ secrets.TOKEN_GITHUB }}
-        export KEYWORDS="${{ vars.KEYWORDS }}"
         export LANGUAGE="${{ vars.LANGUAGE }}"
         export CATEGORIES="${{ vars.CATEGORIES }}"
         export MODEL_NAME="${{ vars.MODEL_NAME }}"
+        export KEYWORDS="${{ vars.KEYWORDS }}"
         
+        echo "=== 调试信息 ==="
+        echo "CATEGORIES: $CATEGORIES"
+        echo "KEYWORDS: $KEYWORDS"
+        echo "==============="
+
         # 使用Scrapy爬取
         # Use Scrapy to crawl
         scrapy crawl arxiv -o ../data/${today}.jsonl
@@ -66,6 +71,14 @@ jobs:
         echo "执行去重检查... / Performing intelligent deduplication check..."
         
         cd daily_arxiv
+
+        # 传递环境变量
+        export KEYWORDS="${{ vars.KEYWORDS }}"
+
+        echo "=== 调试信息 ==="
+        echo "KEYWORDS: $KEYWORDS"
+        echo "==============="
+
         # 执行去重检查脚本 / Execute intelligent deduplication check script
         set +e  # 暂时允许命令失败 / Temporarily allow command failure
         python daily_arxiv/check_stats.py
@@ -311,7 +324,6 @@ jobs:
         # These files are already saved to temporary directory, so safe to remove
         rm -rf data/*.jsonl 2>/dev/null || true
         rm -f assets/file-list.txt 2>/dev/null || true
-        rm -f data/*.md 2>/dev/null || true
         
         # 检查 data 分支是否存在 / Check if data branch exists
         if git ls-remote --heads origin data | grep -q data; then
