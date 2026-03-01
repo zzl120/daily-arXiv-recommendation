@@ -13,6 +13,42 @@ import sys
 import os
 from datetime import datetime, timedelta
 
+
+def filter_by_keywords(papers):
+    """
+    根据关键词过滤论文
+    检查标题和摘要是否包含关键词
+
+    Returns:
+        list: 过滤后的论文列表
+    """
+    keywords = os.environ.get("KEYWORDS", "")
+    print(f"[DEBUG] check_stats 读取的 KEYWORDS = '{keywords}'", file=sys.stderr)
+
+    if not keywords:
+        print("关键词未设置，不过滤 / Keywords not set, skipping filter", file=sys.stderr)
+        return papers
+
+    keyword_list = [k.strip().lower() for k in keywords.split(",") if k.strip()]
+    print(f"关键词过滤列表: {keyword_list}", file=sys.stderr)
+
+    filtered_papers = []
+    for paper in papers:
+        title = paper.get("title", "") or ""
+        summary = paper.get("summary", "") or ""
+
+        title_lower = title.lower()
+        summary_lower = summary.lower()
+
+        # 检查标题或摘要是否包含任意一个关键词
+        if any(kw in title_lower or kw in summary_lower for kw in keyword_list):
+            filtered_papers.append(paper)
+        else:
+            print(f"关键词过滤跳过: {paper.get('id', 'unknown')} - '{title[:50]}...' 不包含关键词", file=sys.stderr)
+
+    print(f"关键词过滤后剩余论文数: {len(filtered_papers)} / Remaining papers after keyword filter: {len(filtered_papers)}", file=sys.stderr)
+    return filtered_papers
+
 def load_papers_data(file_path):
     """
     从jsonl文件中加载完整的论文数据
@@ -87,6 +123,13 @@ def perform_deduplication():
 
         if not today_papers:
             return "no_data"
+
+        # 关键词过滤
+        today_papers = filter_by_keywords(today_papers)
+
+        if not today_papers:
+            print("关键词过滤后无论文，停止工作流 / No papers after keyword filter, stop workflow", file=sys.stderr)
+            return "no_new_content"
 
         # 收集历史多日 ID 集合
         history_ids = set()
