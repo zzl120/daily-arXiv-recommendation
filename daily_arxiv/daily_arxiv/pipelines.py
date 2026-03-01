@@ -26,6 +26,16 @@ class DailyArxivPipeline:
         paper = next(self.client.results(search))
         item["authors"] = [a.name for a in paper.authors]
         item["title"] = paper.title
+
+        # 获取作者单位信息
+        affiliations = []
+        for author in paper.authors:
+            if hasattr(author, 'affiliation') and author.affiliation:
+                affiliations.append(author.affiliation)
+            else:
+                affiliations.append("")
+        item["authors_affiliation"] = affiliations
+        
         item["categories"] = paper.categories
         item["comment"] = paper.comment
         item["summary"] = paper.summary
