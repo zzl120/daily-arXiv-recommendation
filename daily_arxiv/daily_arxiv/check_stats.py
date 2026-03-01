@@ -41,7 +41,7 @@ def filter_by_keywords(papers):
         summary_lower = summary.lower()
 
         # 检查标题或摘要是否包含任意一个关键词
-        if any(kw in title_lower or kw in summary_lower for kw in keyword_list):
+        if any(kw in title_lower for kw in keyword_list):
             filtered_papers.append(paper)
         else:
             print(f"关键词过滤跳过: {paper.get('id', 'unknown')} - '{title[:50]}...' 不包含关键词", file=sys.stderr)
