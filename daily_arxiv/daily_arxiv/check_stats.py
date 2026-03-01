@@ -41,7 +41,7 @@ def filter_by_keywords(papers):
         summary_lower = summary.lower()
 
         # 检查标题或摘要是否包含任意一个关键词
-        if any(kw in title_lower for kw in keyword_list):
+        if any(kw in title_lower or kw in summary_lower for kw in keyword_list):
             filtered_papers.append(paper)
         else:
             print(f"关键词过滤跳过: {paper.get('id', 'unknown')} - '{title[:50]}...' 不包含关键词", file=sys.stderr)
@@ -131,6 +131,13 @@ def perform_deduplication():
             print("关键词过滤后无论文，停止工作流 / No papers after keyword filter, stop workflow", file=sys.stderr)
             return "no_new_content"
 
+        # 保存关键词过滤后的数据到文件
+        if save_papers_data(today_papers, today_file):
+            print(f"关键词过滤后数据已保存 / Keyword filtered data saved", file=sys.stderr)
+        else:
+            print("保存关键词过滤后数据失败 / Failed to save keyword filtered data", file=sys.stderr)
+            return "error"
+
         # 收集历史多日 ID 集合
         history_ids = set()
         for i in range(1, history_days + 1):
@@ -140,6 +147,9 @@ def perform_deduplication():
             history_ids.update(past_ids)
 
         print(f"历史{history_days}日去重库大小: {len(history_ids)} / History {history_days} days deduplication library size: {len(history_ids)}", file=sys.stderr)
+
+        # 重新计算过滤后的论文ID集合
+        today_ids = set(paper.get('id', '') for paper in today_papers)
 
         duplicate_ids = today_ids & history_ids
 
