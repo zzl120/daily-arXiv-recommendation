@@ -389,6 +389,7 @@ function parseJsonlData(jsonlText, date) {
                 title: paper.title,
                 url: paper.abs || paper.pdf || `https://arxiv.org/abs/${paper.id}`,
                 authors: Array.isArray(paper.authors) ? paper.authors.join(', ') : paper.authors,
+                authors_affiliation: paper.authors_affiliation || [],
                 category: allCategories,
                 summary: summary,
                 details: paper.summary || '',
@@ -502,6 +503,8 @@ function createPaperCard(paper, index) {
         <div class="paper-card-header">
             <h3 class="paper-card-title">${escapeHtml(paper.title)}</h3>
             <p class="paper-card-authors">${escapeHtml(paper.authors)}</p>
+            ${paper.authors_affiliation && paper.authors_affiliation.length > 0 && paper.authors_affiliation.some(a => a) ?
+                `<p class="paper-card-affiliations">${escapeHtml(paper.authors_affiliation.filter(a => a).join('; '))}</p>` : ''}
         </div>
         <div class="paper-card-categories">
             ${categoryTags}
@@ -628,6 +631,8 @@ function showPaperDetails(paper, paperIndex) {
     const modalContent = `
         <div class="paper-details">
             <p><strong>Authors:</strong> ${escapeHtml(paper.authors)}</p>
+            ${paper.authors_affiliation && paper.authors_affiliation.length > 0 && paper.authors_affiliation.some(a => a) ?
+                `<p><strong>Affiliations:</strong> ${escapeHtml(paper.authors_affiliation.filter(a => a).join('; '))}</p>` : ''}
             <p><strong>Categories:</strong> ${paper.category.join(', ')}</p>
             <p><strong>Date:</strong> ${formatDate(paper.date)}</p>
 
