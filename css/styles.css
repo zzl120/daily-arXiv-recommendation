@@ -656,6 +656,13 @@ body {
     margin-bottom: 0.75rem;
 }
 
+.paper-card-affiliations {
+    color: var(--text-tertiary);
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+    font-style: italic;
+}
+
 .paper-card-categories {
     display: flex;
     flex-wrap: wrap;
