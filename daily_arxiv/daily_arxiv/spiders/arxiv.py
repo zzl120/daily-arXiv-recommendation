@@ -2,6 +2,7 @@ import scrapy
 import os
 import re
 
+
 class ArxivSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -9,17 +10,6 @@ class ArxivSpider(scrapy.Spider):
         categories = categories.split(",")
         # 保存目标分类列表，用于后续验证
         self.target_categories = set(map(str.strip, categories))
-
-        # 获取关键词过滤配置
-        keywords = os.environ.get("KEYWORDS", "")
-        if keywords:
-            self.keywords = [k.strip().lower() for k in keywords.split(",") if k.strip()]
-        else:
-            self.keywords = []
-
-        self.logger.info(f"目标分类: {self.target_categories}")
-        self.logger.info(f"关键词过滤: {self.keywords}")
-
         self.start_urls = [
             f"https://arxiv.org/list/{cat}/new" for cat in self.target_categories
         ]  # 起始URL（计算机科学领域的最新论文）
@@ -57,32 +47,6 @@ class ArxivSpider(scrapy.Spider):
             if not paper_dd:
                 continue
             
-            # 提取论文标题 - 尝试多种方式
-            title = ""
-            # 方式1: 获取 .title 元素的所有文本（包括 <br> 标签转换后的内容）
-            title_elem = paper_dd.css(".title")
-            if title_elem:
-                title = title_elem.get()
-                if title:
-                    # 清理 HTML 标签
-                    title = re.sub(r'<[^>]+>', '', title)
-                    title = title.strip()
-
-            # 如果方式1失败，尝试方式2
-            if not title:
-                title = paper_dd.css(".title::text").get()
-                if title:
-                    title = title.strip()
-
-            # 关键词过滤：如果配置了关键词，则只保留包含任意一个关键词的论文
-            if self.keywords and title:
-                title_lower = title.lower()
-                if not any(kw in title_lower for kw in self.keywords):
-                    self.logger.info(f"关键词过滤跳过: {arxiv_id} - '{title}' 不包含 {self.keywords}")
-                    continue
-            elif self.keywords and not title:
-                self.logger.info(f"标题为空，跳过: {arxiv_id}")
-
             # 提取论文分类信息 - 在subjects部分
             subjects_text = paper_dd.css(".list-subjects .primary-subject::text").get()
             if not subjects_text:
@@ -99,10 +63,9 @@ class ArxivSpider(scrapy.Spider):
                 if paper_categories.intersection(self.target_categories):
                     yield {
                         "id": arxiv_id,
-                        "title": title,  # 添加标题
-                        "categories": list(paper_categories),
+                        "categories": list(paper_categories),  # 添加分类信息用于调试
                     }
-                    self.logger.info(f"Found paper {arxiv_id}: {title[:50]}...")
+                    self.logger.info(f"Found paper {arxiv_id} with categories {paper_categories}")
                 else:
                     self.logger.debug(f"Skipped paper {arxiv_id} with categories {paper_categories} (not in target {self.target_categories})")
             else:
