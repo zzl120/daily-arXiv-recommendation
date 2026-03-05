@@ -7,15 +7,6 @@ on:
   schedule:
     - cron: "30 1 * * *"
   workflow_dispatch:
-    inputs:
-      date_from:
-        description: '开始日期 (YYYY-MM-DD)'
-        required: false
-        default: ''
-      date_to:
-        description: '结束日期 (YYYY-MM-DD)'
-        required: false
-        default: ''
 
 
 jobs:
@@ -34,63 +25,45 @@ jobs:
       id: crawl_step
       run: |
         source .venv/bin/activate
+        today=$(date -u "+%Y-%m-%d")
+        echo "开始爬取 $today 的arXiv论文... / Starting to crawl $today arXiv papers..."
         
-        # 获取日期参数，如果没有则使用今天
-        DATE_FROM="${{ github.event.inputs.date_from }}"
-        DATE_TO="${{ github.event.inputs.date_to }}"
-
-        if [ -z "$DATE_FROM" ]; then
-            DATE_FROM=$(date -u "+%Y-%m-%d")
-            DATE_TO="$DATE_FROM"
+        # 检查今日文件是否已存在，如存在则删除 / Check if today's file exists, delete if found
+        if [ -f "data/${today}.jsonl" ]; then
+            echo "🗑️ 发现今日文件已存在，正在删除重新生成... / Found existing today's file, deleting for fresh start..."
+            rm "data/${today}.jsonl"
+            echo "✅ 已删除现有文件：data/${today}.jsonl / Deleted existing file: data/${today}.jsonl"
+        else
+            echo "📝 今日文件不存在，准备新建... / Today's file doesn't exist, ready to create new one..."
         fi
         
-        echo "开始爬取 $DATE_FROM 到 $DATE_TO 的arXiv论文... / Starting to crawl $DATE_FROM to $DATE_TO arXiv papers..."
+        cd daily_arxiv
+        export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+        export OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
+        export TOKEN_GITHUB=${{ secrets.TOKEN_GITHUB }}
+        export LANGUAGE="${{ vars.LANGUAGE }}"
+        export CATEGORIES="${{ vars.CATEGORIES }}"
+        export MODEL_NAME="${{ vars.MODEL_NAME }}"
+        export KEYWORDS="${{ vars.KEYWORDS }}"
         
-        # 遍历日期范围 / Iterate through date range
-        current_date="$DATE_FROM"
-        while [ "$(date -d "$current_date" +%Y%m%d)" -le "$(date -d "$DATE_TO" +%Y%m%d)" ]; do
-            echo "爬取日期: $current_date ..."
+        echo "=== 调试信息 ==="
+        echo "CATEGORIES: $CATEGORIES"
+        echo "KEYWORDS: $KEYWORDS"
+        echo "==============="
 
-            # 检查当日文件是否已存在，如存在则删除 / Check if file exists, delete if found
-            if [ -f "data/${current_date}.jsonl" ]; then
-                echo "🗑️ 发现文件已存在，正在删除重新生成... / Found existing file, deleting for fresh start..."
-                rm "data/${current_date}.jsonl"
-            fi
+        # 使用Scrapy爬取
+        # Use Scrapy to crawl
+        scrapy crawl arxiv -o ../data/${today}.jsonl
         
-            cd daily_arxiv
-            export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-            export OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
-            export TOKEN_GITHUB=${{ secrets.TOKEN_GITHUB }}
-            export LANGUAGE="${{ vars.LANGUAGE }}"
-            export CATEGORIES="${{ vars.CATEGORIES }}"
-            export MODEL_NAME="${{ vars.MODEL_NAME }}"
-            export KEYWORDS="${{ vars.KEYWORDS }}"
+        # 检查爬取是否成功 / Check if crawling was successful
+        if [ ! -f "../data/${today}.jsonl" ]; then
+            echo "爬取失败，未生成数据文件 / Crawling failed, no data file generated"
+            exit 1
+        fi
         
-            echo "=== 调试信息 ==="
-            echo "CATEGORIES: $CATEGORIES"
-            echo "KEYWORDS: $KEYWORDS"
-            echo "==============="
+        echo "crawl_date=$today" >> $GITHUB_OUTPUT
+        echo "爬取完成 / Crawling completed"
         
-            # 使用Scrapy爬取指定日期
-            scrapy crawl arxiv -o ../data/${current_date}.jsonl -a date_from=$current_date -a date_to=$current_date
-
-            # 检查爬取是否成功 / Check if crawling was successful
-            if [ ! -f "../data/${current_date}.jsonl" ]; then
-                echo "⚠️ 爬取 $current_date 失败 / Crawling $current_date failed"
-            else
-                echo "✅ $current_date 爬取完成 / $current_date crawled successfully"
-            fi
-            cd ..
-
-            # 日期加1天 / Add 1 day
-            current_date=$(date -u -d "$current_date + 1 day" "+%Y-%m-%d")
-        done
-
-        echo "✅ 日期范围爬取完成 / Date range crawling completed"
-        echo "crawl_date=$DATE_FROM" >> $GITHUB_OUTPUT
-        echo "date_from=$DATE_FROM" >> $GITHUB_OUTPUT
-        echo "date_to=$DATE_TO" >> $GITHUB_OUTPUT
-
     - name: Check for duplicates
       id: dedup_check
       run: |
@@ -142,11 +115,7 @@ jobs:
       if: steps.dedup_check.outputs.has_new_content == 'true'
       run: |
         source .venv/bin/activate
-
-        # 获取日期范围
-        DATE_FROM="${{ steps.crawl_step.outputs.date_from }}"
-        DATE_TO="${{ steps.crawl_step.outputs.date_to }}"
-
+        today=${{ steps.crawl_step.outputs.crawl_date }}
         echo "开始AI增强处理... / Starting AI enhancement processing..."
         
         cd ai
@@ -155,27 +124,13 @@ jobs:
         export LANGUAGE="${{ vars.LANGUAGE }}"
         export MODEL_NAME="${{ vars.MODEL_NAME }}"
         
-        # 遍历日期范围，处理每一天的数据
-        current_date="$DATE_FROM"
-        while [ "$(date -d "$current_date" +%Y%m%d)" -le "$(date -d "$DATE_TO" +%Y%m%d)" ]; do
-            echo "处理日期: $current_date ..."
+        python enhance.py --data ../data/${today}.jsonl
         
-            if [ -f "../data/${current_date}.jsonl" ]; then
-                python enhance.py --data ../data/${current_date}.jsonl
-
-                if [ $? -ne 0 ]; then
-                    echo "⚠️ AI处理 $current_date 失败 / AI processing $current_date failed"
-                else
-                    echo "✅ $current_date AI处理完成 / $current_date AI processing completed"
-                fi
-            else
-                echo "⚠️ $current_date 数据文件不存在，跳过 / $current_date data file not found, skipping"
-            fi
-
-            # 日期加1天
-            current_date=$(date -u -d "$current_date + 1 day" "+%Y-%m-%d")
-        done
-
+        # 检查AI处理是否成功 / Check if AI processing was successful
+        if [ $? -ne 0 ]; then
+            echo "AI处理失败 / AI processing failed"
+            exit 1
+        fi
         echo "AI增强处理完成 / AI enhancement processing completed"
         
     - name: Convert to Markdown
