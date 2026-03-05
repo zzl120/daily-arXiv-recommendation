@@ -190,7 +190,8 @@ def process_single_item(chain, item: Dict, language: str, use_full_paper: bool =
         "method": "Method extraction failed",
         "result": "Result analysis unavailable",
         "conclusion": "Conclusion extraction failed",
-        "author_affiliation": ""
+        "author_affiliation": "",
+        "keywords": ""
     }
     
     # 获取论文内容：优先使用 LaTeX 源码，否则使用摘要
