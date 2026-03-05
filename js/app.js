@@ -329,6 +329,9 @@ async function loadPapersByDate(date) {
         renderPapers();
         renderFeaturedPapers();
 
+        // 更新统计信息
+        updateStats();
+
     } catch (error) {
         console.error('加载论文数据失败:', error);
         container.innerHTML = `
