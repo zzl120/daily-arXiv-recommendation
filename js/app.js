@@ -384,12 +384,14 @@ function parseJsonlData(jsonlText, date) {
             }
 
             const summary = paper.AI && paper.AI.tldr ? paper.AI.tldr : paper.summary;
+            const authorAffiliation = paper.AI && paper.AI.author_affiliation ? paper.AI.author_affiliation :
+                                      (paper.authors_affiliation ? paper.authors_affiliation.join(', ') : '');
 
             result[primaryCategory].push({
                 title: paper.title,
                 url: paper.abs || paper.pdf || `https://arxiv.org/abs/${paper.id}`,
                 authors: Array.isArray(paper.authors) ? paper.authors.join(', ') : paper.authors,
-                authors_affiliation: paper.authors_affiliation || [],
+                authors_affiliation: authorAffiliation,
                 category: allCategories,
                 summary: summary,
                 details: paper.summary || '',
@@ -499,12 +501,19 @@ function createPaperCard(paper, index) {
         `<span class="category-tag">${cat}</span>`
     ).join('');
 
+    // 处理作者单位，支持数组和字符串两种格式
+    let affiliationHtml = '';
+    if (Array.isArray(paper.authors_affiliation) && paper.authors_affiliation.length > 0 && paper.authors_affiliation.some(a => a)) {
+        affiliationHtml = `<p class="paper-card-affiliations">${escapeHtml(paper.authors_affiliation.filter(a => a).join('; '))}</p>`;
+    } else if (typeof paper.authors_affiliation === 'string' && paper.authors_affiliation.trim()) {
+        affiliationHtml = `<p class="paper-card-affiliations">${escapeHtml(paper.authors_affiliation)}</p>`;
+    }
+
     card.innerHTML = `
         <div class="paper-card-header">
             <h3 class="paper-card-title">${escapeHtml(paper.title)}</h3>
             <p class="paper-card-authors">${escapeHtml(paper.authors)}</p>
-            ${paper.authors_affiliation && paper.authors_affiliation.length > 0 && paper.authors_affiliation.some(a => a) ?
-                `<p class="paper-card-affiliations">${escapeHtml(paper.authors_affiliation.filter(a => a).join('; '))}</p>` : ''}
+            ${affiliationHtml}
         </div>
         <div class="paper-card-categories">
             ${categoryTags}
@@ -628,11 +637,18 @@ function showPaperDetails(paper, paperIndex) {
 
     modalTitle.textContent = paper.title;
 
+    // 处理作者单位，支持数组和字符串两种格式
+    let affiliationText = '';
+    if (Array.isArray(paper.authors_affiliation) && paper.authors_affiliation.length > 0 && paper.authors_affiliation.some(a => a)) {
+        affiliationText = `<p><strong>Affiliations:</strong> ${escapeHtml(paper.authors_affiliation.filter(a => a).join('; '))}</p>`;
+    } else if (typeof paper.authors_affiliation === 'string' && paper.authors_affiliation.trim()) {
+        affiliationText = `<p><strong>Affiliations:</strong> ${escapeHtml(paper.authors_affiliation)}</p>`;
+    }
+
     const modalContent = `
         <div class="paper-details">
             <p><strong>Authors:</strong> ${escapeHtml(paper.authors)}</p>
-            ${paper.authors_affiliation && paper.authors_affiliation.length > 0 && paper.authors_affiliation.some(a => a) ?
-                `<p><strong>Affiliations:</strong> ${escapeHtml(paper.authors_affiliation.filter(a => a).join('; '))}</p>` : ''}
+            ${affiliationText}
             <p><strong>Categories:</strong> ${paper.category.join(', ')}</p>
             <p><strong>Date:</strong> ${formatDate(paper.date)}</p>
 
