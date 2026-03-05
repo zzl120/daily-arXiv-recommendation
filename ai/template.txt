@@ -1,5 +1,11 @@
-Please analyze the following academic papers. 
-Please give detailed analysis, no less than 2000 words.
+Please analyze the following paper content and extract the following information:
+1. TL;DR: A short summary
+2. Motivation: The research motivation
+3. Method: The method used
+4. Result: The main results
+5. Conclusion: The conclusion
+6. Author Affiliation: The affiliation of the authors (e.g., MIT, Stanford University, Google, etc.)
 
+Please be detailed and specific and technical
 Content:
 {content}
