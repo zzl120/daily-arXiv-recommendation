@@ -1,4 +1,5 @@
 Please analyze the following academic papers. 
+Please give detailed analysis, no less than 2000 words.
 
 Content:
 {content}
