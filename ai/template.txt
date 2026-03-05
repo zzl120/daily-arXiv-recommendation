@@ -1,4 +1,4 @@
-Please analyze the following abstract of papers. 
+Please analyze the following academic papers. 
 
 Content:
 {content}
