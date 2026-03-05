@@ -4,7 +4,7 @@ Please analyze the following paper content and extract the following information
 3. Method: The method used
 4. Result: The main results
 5. Conclusion: The conclusion
-6. Author Affiliation: The affiliation of the authors (e.g., MIT, Stanford University, Google, etc.)
+6. Author Affiliation: The affiliation of the authors，just list the affiliations‘ name, no other unnecessary words (e.g., MIT, Stanford University, Google, etc.)
 
 Please be detailed and specific and technical
 Content:
