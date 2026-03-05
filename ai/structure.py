@@ -8,3 +8,4 @@ class Structure(BaseModel):
     result: str = Field(description="result of this paper")
     conclusion: str = Field(description="conclusion of this paper")    
     author_affiliation: str = Field(description="the affiliation of the authors, e.g. MIT, Stanford University, Google, etc.")
+    keywords: str = Field(description="three key topics or keywords of this paper, separated by comma")
