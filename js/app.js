@@ -395,6 +395,8 @@ function parseJsonlData(jsonlText, date) {
                 url: paper.abs || paper.pdf || `https://arxiv.org/abs/${paper.id}`,
                 authors: Array.isArray(paper.authors) ? paper.authors.join(', ') : paper.authors,
                 authors_affiliation: authorAffiliation,
+                // 优先使用 AI 分析的关键词，否则使用原始类别
+                keywords: paper.AI && paper.AI.keywords ? paper.AI.keywords.split(',').map(k => k.trim()).filter(k => k) : allCategories,
                 category: allCategories,
                 summary: summary,
                 details: paper.summary || '',
@@ -500,8 +502,10 @@ function createPaperCard(paper, index) {
     card.className = 'paper-card fade-in';
     card.onclick = () => showPaperDetails(paper, index);
 
-    const categoryTags = paper.category.map(cat =>
-        `<span class="category-tag">${cat}</span>`
+    // 优先使用 AI 分析的关键词，否则使用原始类别
+    const displayTags = paper.keywords && paper.keywords.length > 0 ? paper.keywords : paper.category;
+    const tagElements = displayTags.slice(0, 3).map(tag =>
+        `<span class="category-tag">${escapeHtml(tag)}</span>`
     ).join('');
 
     // 处理作者单位，支持数组和字符串两种格式
@@ -519,7 +523,7 @@ function createPaperCard(paper, index) {
             ${affiliationHtml}
         </div>
         <div class="paper-card-categories">
-            ${categoryTags}
+            ${tagElements}
         </div>
         <p class="paper-card-summary">${escapeHtml(paper.summary || '')}</p>
         <div class="paper-card-footer">
@@ -648,11 +652,16 @@ function showPaperDetails(paper, paperIndex) {
         affiliationText = `<p><strong>Affiliations:</strong> ${escapeHtml(paper.authors_affiliation)}</p>`;
     }
 
+    // 详情弹窗中显示关键词（如果有的话）和原始类别
+    const displayKeywords = paper.keywords && paper.keywords.length > 0 ?
+        `<p><strong>Keywords:</strong> ${paper.keywords.slice(0, 3).map(k => escapeHtml(k)).join(', ')}</p>` : '';
+
     const modalContent = `
         <div class="paper-details">
             <p><strong>Authors:</strong> ${escapeHtml(paper.authors)}</p>
             ${affiliationText}
-            <p><strong>Categories:</strong> ${paper.category.join(', ')}</p>
+            ${displayKeywords}
+            <p><strong>arXiv Categories:</strong> ${paper.category.join(', ')}</p>
             <p><strong>Date:</strong> ${formatDate(paper.date)}</p>
 
             <h3>TL;DR</h3>
