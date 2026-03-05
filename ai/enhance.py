@@ -2,8 +2,10 @@ import os
 import json
 import sys
 import re
+import tarfile
+import io
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict
+from typing import List, Dict, Optional
 from queue import Queue
 from threading import Lock
 # INSERT_YOUR_CODE
@@ -27,14 +29,107 @@ if os.path.exists('.env'):
 template = open("template.txt", "r").read()
 system = open("system.txt", "r").read()
 
+# 缓存目录用于存储已下载的 LaTeX 源码
+LATEX_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "latex_cache")
+os.makedirs(LATEX_CACHE_DIR, exist_ok=True)
+
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=str, required=True, help="jsonline data file")
     parser.add_argument("--max_workers", type=int, default=1, help="Maximum number of parallel workers")
+    parser.add_argument("--use_full_paper", action="store_true", default=True, help="Use full paper content instead of just abstract")
+    parser.add_argument("--max_paper_length", type=int, default=100000, help="Maximum length of paper content to send to LLM")
     return parser.parse_args()
 
-def process_single_item(chain, item: Dict, language: str) -> Dict:
+def get_latex_source(arxiv_id: str) -> Optional[str]:
+    """
+    下载并提取 arXiv 论文的 LaTeX 源码内容。
+
+    Args:
+        arxiv_id: arXiv 论文 ID (如 2301.12345 或 2301.12345v1)
+
+    Returns:
+        提取的文本内容，如果失败返回 None
+    """
+    # 清理 arxiv_id，去掉版本号
+    clean_id = arxiv_id.split('v')[0]
+    cache_file = os.path.join(LATEX_CACHE_DIR, f"{clean_id}.txt")
+
+    # 检查缓存
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception:
+            pass
+
+    # 下载 LaTeX 源码 (tar.gz 格式)
+    source_url = f"https://arxiv.org/e-print/{clean_id}"
+
+    try:
+        print(f"Downloading LaTeX source for {arxiv_id}...", file=sys.stderr)
+        response = requests.get(source_url, timeout=60)
+
+        if response.status_code != 200:
+            print(f"Failed to download source for {arxiv_id}: status {response.status_code}", file=sys.stderr)
+            return None
+
+        # 解压 tar.gz 文件
+        content = b""
+        try:
+            # 将下载的内容作为 tarfile 处理
+            with tarfile.open(fileobj=io.BytesIO(response.content), mode="r:gz") as tar:
+                # 遍历所有文件
+                for member in tar.getmembers():
+                    if member.isfile():
+                        # 只处理 .tex 文件
+                        if member.name.endswith('.tex'):
+                            f = tar.extractfile(member)
+                            if f:
+                                content += f.read()
+        except Exception as e:
+            # 如果不是 tar.gz，可能是单个文件
+            content = response.content
+
+        # 尝试解码为文本
+        try:
+            text = content.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                text = content.decode('latin-1')
+            except Exception:
+                print(f"Failed to decode source for {arxiv_id}", file=sys.stderr)
+                return None
+
+        # 清理 LaTeX 特殊字符和命令，保留可读文本
+        # 移除注释
+        text = re.sub(r'%.*$', '', text, flags=re.MULTILINE)
+        # 移除一些常见的 LaTeX 命令（简化处理）
+        text = re.sub(r'\\begin\{[^}]+\}', '', text)
+        text = re.sub(r'\\end\{[^}]+\}', '', text)
+        text = re.sub(r'\\[a-zA-Z]+\{[^}]*\}', '', text)
+        text = re.sub(r'\\[a-zA-Z]+', ' ', text)
+        # 移除数学公式标记
+        text = re.sub(r'\[.*?\]', ' ', text)
+        text = re.sub(r'\(.*?\)', ' ', text)
+        # 清理多余空白
+        text = re.sub(r'\s+', ' ', text)
+
+        # 缓存结果
+        try:
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                f.write(text)
+        except Exception:
+            pass
+
+        return text
+
+    except Exception as e:
+        print(f"Error downloading source for {arxiv_id}: {e}", file=sys.stderr)
+        return None
+
+def process_single_item(chain, item: Dict, language: str, use_full_paper: bool = True, max_paper_length: int = 8000) -> Dict:
     def is_sensitive(content: str) -> bool:
         """
         调用 spam.dw-dengwei.workers.dev 接口检测内容是否包含敏感词。
@@ -124,10 +219,33 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         "conclusion": "Conclusion extraction failed"
     }
     
+    # 获取论文内容：优先使用 LaTeX 源码，否则使用摘要
+    paper_content = item.get('summary', '')
+
+    if use_full_paper:
+        # 从 item 中获取 arxiv_id
+        arxiv_id = item.get('arxiv_id', '')
+        if not arxiv_id:
+            # 尝试从 id 字段提取
+            item_id = item.get('id', '')
+            if 'arxiv.org' in item_id:
+                arxiv_id = item_id.split('/')[-1]
+            else:
+                arxiv_id = item_id
+
+        if arxiv_id:
+            latex_content = get_latex_source(arxiv_id)
+            if latex_content:
+                # 截取到指定长度
+                if len(latex_content) > max_paper_length:
+                    latex_content = latex_content[:max_paper_length]
+                paper_content = latex_content
+                print(f"Using full paper content for {arxiv_id}: {len(paper_content)} chars", file=sys.stderr)
+
     try:
         response: Structure = chain.invoke({
             "language": language,
-            "content": item['summary']
+            "content": paper_content
         })
         item['AI'] = response.model_dump()
     except langchain_core.exceptions.OutputParserException as e:
@@ -165,7 +283,7 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
             return None
     return item
 
-def process_all_items(data: List[Dict], model_name: str, language: str, max_workers: int) -> List[Dict]:
+def process_all_items(data: List[Dict], model_name: str, language: str, max_workers: int, use_full_paper: bool = True, max_paper_length: int = 8000) -> List[Dict]:
     """并行处理所有数据项"""
     llm = ChatOpenAI(model=model_name).with_structured_output(Structure, method="function_calling")
     print('Connect to:', model_name, file=sys.stderr)
@@ -182,7 +300,7 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 提交所有任务
         future_to_idx = {
-            executor.submit(process_single_item, chain, item, language): idx
+            executor.submit(process_single_item, chain, item, language, use_full_paper, max_paper_length): idx
             for idx, item in enumerate(data)
         }
         
@@ -243,7 +361,9 @@ def main():
         data,
         model_name,
         language,
-        args.max_workers
+        args.max_workers,
+        args.use_full_paper,
+        args.max_paper_length
     )
     
     # 保存结果
