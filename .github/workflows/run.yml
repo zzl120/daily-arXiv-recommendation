@@ -11,11 +11,11 @@ on:
       date_from:
         description: '开始日期 (YYYY-MM-DD)'
         required: false
-        default: '2026-02-20'
+        default: ''
       date_to:
         description: '结束日期 (YYYY-MM-DD)'
         required: false
-        default: '2026-03-04'
+        default: ''
 
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
         
         # 遍历日期范围 / Iterate through date range
         current_date="$DATE_FROM"
-        while [[ "$current_date" <= "$DATE_TO" ]]; do
+        while [ "$(date -d "$current_date" +%Y%m%d)" -le "$(date -d "$DATE_TO" +%Y%m%d)" ]; do
             echo "爬取日期: $current_date ..."
 
             # 检查当日文件是否已存在，如存在则删除 / Check if file exists, delete if found
@@ -157,7 +157,7 @@ jobs:
         
         # 遍历日期范围，处理每一天的数据
         current_date="$DATE_FROM"
-        while [[ "$current_date" <= "$DATE_TO" ]]; do
+        while [ "$(date -d "$current_date" +%Y%m%d)" -le "$(date -d "$DATE_TO" +%Y%m%d)" ]; do
             echo "处理日期: $current_date ..."
         
             if [ -f "../data/${current_date}.jsonl" ]; then
