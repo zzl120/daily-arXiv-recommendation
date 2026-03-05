@@ -6,4 +6,5 @@ class Structure(BaseModel):
     motivation: str = Field(description="describe the motivation in this paper")
     method: str = Field(description="method of this paper")
     result: str = Field(description="result of this paper")
-    conclusion: str = Field(description="conclusion of this paper")
+    conclusion: str = Field(description="conclusion of this paper")    
+    author_affiliation: str = Field(description="the affiliation of the authors, e.g. MIT, Stanford University, Google, etc.")
