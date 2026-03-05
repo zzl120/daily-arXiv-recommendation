@@ -236,6 +236,12 @@ def process_single_item(chain, item: Dict, language: str, use_full_paper: bool =
         if arxiv_id:
             latex_content = get_latex_source(arxiv_id)
             if latex_content:
+                # 打印部分内容以确认解析正确
+                print(f"\n=== LaTeX content preview for {arxiv_id} ===", file=sys.stderr)
+                preview = latex_content[:500].replace('\n', ' ')
+                print(f"{preview}...", file=sys.stderr)
+                print(f"=== End of preview (total: {len(latex_content)} chars) ===\n", file=sys.stderr)
+
                 # 截取到指定长度
                 if len(latex_content) > max_paper_length:
                     latex_content = latex_content[:max_paper_length]
